@@ -1,6 +1,7 @@
 
 // Configuração inicial OOK
-int n_entradas_ook = 3;
+int n_entradas_ook = 3; // Numero de bits no campo de enderecamento;
+int n_bits_campo_dados = 8; // Numero de bits que serah transmitido no campo de dados;
 int pinos_saida_ook[] = {2, 3, 4, 5, 7, 8, 12, 13};
 
 // Configuração inicial CSK
@@ -38,8 +39,8 @@ void loop()
 {
   // Configurações OOK
   int b_ook; // Recebe cada byte da entrada serial
-  int j = 0; // adiciona o valor de b em enderecamento_ook[j] 
-  int saida_ook; // Valores da saída digital do demux
+  int j = 0; // incrementa-se cada vez que o valor de b eh armazenado em enderecamento_ook[]
+  int saida_ook[n_bits_campo_dados]; // Vetor que armazena os bits de dados a serem transmitidos
   const int n_saidas_ook = (int)(pow(2.0, (float)n_entradas_ook) + 0.1); // Calcula novamente o número de saídas OOK que serão utilizadas 
   float num_decimal = 0.0; // Utilizado para converter o valor do demux em número decimal
   int enderecamento_ook[n_entradas_ook];// Entradas de enderecamento ook
@@ -65,19 +66,19 @@ void loop()
         // Atribuir os primeiros bits em controle[] e o último na saída digital
         if (j >= 0 && j < n_entradas_ook)
           enderecamento_ook[j] = b_ook;
-        else
-          saida_ook = b_ook;
+        else if (j >= n_entradas_ook && j < n_entradas_ook + n_bits_campo_dados)
+          saida_ook[j - n_entradas_ook] = b_ook;
         
         j = j + 1;// Incrementa o valor de j
   
         // Laço de Decisão que ocorre quando todos os bits de endereçamento e o de saída OOK forem lidos
-        if (j == n_entradas_ook + 1)
+        if (j == n_entradas_ook + n_bits_campo_dados)
           leitura_dados_ook = true;
-        
+
       } // Final leitura de entrada serial 
     } // Final leitura dos dados OOK
   } // Final ativar ook
-
+  
  // Leitura de dados CSK
   if (ativar_csk)
   {
@@ -150,52 +151,11 @@ void loop()
     } // Fim leitura de dados CSK
   } // Final Ativar CSK
 
-  if (ativar_ook)
-  {
-    // Preparar Transmissão de dados OOK
-    if (transmissao_dados_ook == false)
-    {
-      // Exibir no Serial (precisa tirar depois)
-      for (int i = 0; i < n_entradas_ook; i++)
-        Serial.print(enderecamento_ook[i]);
-      Serial.print(saida_ook);
-      
-      // Converte a entrada de controle do demux em número decimal
-      for (int i = 0; i < n_entradas_ook ; i++)
-        num_decimal += (float)enderecamento_ook[i]*pow(2.0, (float)(n_entradas_ook - 1 - i));
-      num_decimal += 0.1;// Arruma o erro da função pow()
-        
-      // Atribui HIGH ou LOW para a saída Digital
-      for (int i = 0; i < n_saidas_ook; i++)
-        if (i == (int)num_decimal)
-          digitalWrite(pinos_saida_ook[i], saida_ook);
-        else
-          digitalWrite(pinos_saida_ook[i], LOW);
-    
-      transmissao_dados_ook = true;
-    } // Final transmissão de dados OOK 
-  } // Final ativar OOK
-
-  if (ativar_ook && ativar_csk)
-    Serial.print(' ');
-    
   if (ativar_csk)
   {
     // Transmissão de dados CSK
     if (transmissao_dados_csk == false)
-    {
-      /*
-      // Exibir no Serial (precisa tirar depois)
-      for (int i = 0; i < n_saidas_csk; i++){
-        Serial.print(saida_csk[i]);
-        Serial.print(' ');
-      }
-      Serial.println();
-      */
-
-      Serial.print(b_csk);
-      Serial.println();
-      
+    {     
       // Atribui saídas PWM
       for (int i = 0; i < n_saidas_csk; i++)
         analogWrite(pinos_saida_csk[i], saida_csk[i]);
@@ -204,5 +164,37 @@ void loop()
     } // Final transmissão de dados csk
   } // Final Ativar CSK
   
-  
+
+  if (ativar_ook)
+  {    
+    // Converte a entrada de controle do demux em número decimal
+    for (int i = 0; i < n_entradas_ook ; i++)
+      num_decimal += (float)enderecamento_ook[i]*pow(2.0, (float)(n_entradas_ook - 1 - i));
+    num_decimal += 0.1;// Arruma o erro da função pow()
+    
+    // Preparar Transmissão de dados OOK
+    if (transmissao_dados_ook == false)
+    {
+      int saida_escolhida = 0; // Armazena a saida a transmitir os bits do campo OOK
+      // Atribui HIGH ou LOW para a saída Digital
+      for (int i = 0; i < n_saidas_ook; i++)
+        if (i == (int)num_decimal)
+          saida_escolhida = i;
+        else
+          digitalWrite(pinos_saida_ook[i], LOW);
+       
+       for(int i = 0; i < n_bits_campo_dados; i++){
+        if (saida_ook[i] == 1)
+          digitalWrite(pinos_saida_ook[saida_escolhida], HIGH);
+        else
+          digitalWrite(pinos_saida_ook[saida_escolhida], LOW);
+       
+       //Delay provisorio para ver se funciona
+       delay(500);
+       }
+      
+       transmissao_dados_ook = true;
+
+    } // Final transmissão de dados OOK 
+  } // Final ativar OOK  
 } // Final void loop
